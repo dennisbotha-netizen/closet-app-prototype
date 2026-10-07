@@ -171,8 +171,15 @@ const DRESS={
   if(!DRESS.consentOK())return DRESS.consent(()=>DRESS.tryNow());TRY.enqueue(its).then(()=>DRESS.fill())},
  needAvatar(){openSheet(`${head('Make your mini-me first')}<p>One full-body photo, done once. Then Dress Me shows your clothes on you, made by AI.</p><button class="btn full" id="mk">${ic('camera',18)} Make my mini-me</button>`,r=>r.querySelector('#mk').onclick=()=>{closeSheet();setTimeout(TRY.avatarSheet,200)})},
  board(its,msg){const by=k=>its.find(i=>i.cat===k);const cell=k=>by(k)?`<div class="t-${tint(by(k))}"><img src="${by(k).img}" alt="${esc(by(k).name)}"></div>`:'';const row=(ks,c)=>{const h=ks.map(cell).join('');return h?`<div class="b-row ${c}">${h}</div>`:''};
-  return `<div class="board">${its.length?row(['top','outer'],'b1')+row(['bottom'],'b2')+row(['shoes','hat','acc'],'b3'):'<p class="muted" style="margin:auto;text-align:center">Pick pieces from the rails</p>'}</div>
-  ${msg?`<p class="stage-msg">${esc(msg)}</p>`:''}${its.length?`<button class="btn lav sm stage-cta" id="tapTry">${ic('wand',18)} Tap to try on with AI</button>`:''}`},
+  void row;return `${its.length?'<div class="flatlay" id="flat"></div><span class="fl-cap">Flat-lay · drag to tilt</span>':'<div class="board"><p class="muted" style="margin:auto;text-align:center;font:italic 400 18px Bodoni">Pick pieces from the rails</p></div>'}
+  ${msg?`<p class="stage-msg">${esc(msg)}</p>`:''}${its.length?(DRESS._ai?`<button class="btn lav sm stage-cta" id="showAI">${ic('spark',16)} Show AI try-on</button>`:`<button class="btn lav sm stage-cta" id="tapTry">${ic('wand',18)} Tap to try on with AI</button>`):''}`},
+ // v3b: flat-lay composition of the picked pieces, photo tilt (photo3d.js); flat fallback if 3D unsupported
+ POS:{outer:{x:24,y:40,w:40,z:6,r:-8},top:{x:56,y:30,w:50,z:26,r:3},bottom:{x:60,y:68,w:36,z:16,r:-4},acc:{x:20,y:76,w:26,z:34,r:-6},shoes:{x:74,y:83,w:32,z:44,r:8},hat:{x:82,y:12,w:24,z:36,r:12}},
+ layout(its){const has=k=>its.some(i=>i.cat===k);return DRESS.order.map(k=>its.find(i=>i.cat===k)).filter(Boolean).map(i=>{let p={...DRESS.POS[i.cat]};
+  if(i.cat==='top'&&!has('outer'))p={...p,x:48,w:56};if(i.cat==='outer'&&!has('top'))p={...p,x:50,y:32,w:54,z:26};if(i.cat==='bottom'&&!has('top')&&!has('outer'))p={...p,x:50,y:50,w:46};
+  return {...p,src:i.img,alt:i.name}})},
+ mountFlat(){const f=$('#flat');if(!f)return;const L=DRESS.layout(DRESS.items());if(DRESS._p3)DRESS._p3.stop();DRESS._p3=window.P3D&&P3D.mount(f,{mode:'fitting',items:L});
+  if(!DRESS._p3)f.innerHTML=L.map(p=>`<img src="${p.src}" alt="${esc(p.alt)}" style="position:absolute;left:${p.x}%;top:${p.y}%;width:${p.w}%;transform:translate(-50%,-50%) rotate(${p.r}deg)">`).join('')},
  async fill(){const st=$('#stage');if(!st||S.tab!=='dress')return;const its=DRESS.items();const ui=$('#stageUI'),person=$('#person');const me=S.me;const seq=(DRESS._seq=(DRESS._seq||0)+1);
   const show=(src,cls='')=>{st.className='stage '+cls;person.style.display=src?'':'none';if(src&&person.getAttribute('src')!==src){person.classList.remove('drop');person.src=src;void person.offsetWidth;person.classList.add('drop')}};
   const extras=its.filter(i=>['shoes','hat','acc'].includes(i.cat)||(i.cat==='outer'&&its.some(x=>x.cat==='top')));
@@ -180,8 +187,9 @@ const DRESS={
   if(!me.base){show('','board-mode');ui.innerHTML=DRESS.board(its,its.length?'':null);DRESS.bindUI();return}
   const r=await TRY.lookup(its);if(seq!==DRESS._seq)return;const base=me.cutout||me.avatar;
   if(r.state==='none'){show(base);ui.innerHTML=`<span class="stage-badge">${its.length?'Pick a top or bottom for AI':'Your mini-me'}</span>${extraHTML}`;return}
+  DRESS._ai=r.state==='done';if(r.state==='done'&&DRESS.flatView){show('','board-mode');ui.innerHTML=DRESS.board(its,null);DRESS.bindUI();return}
   if(r.state==='done'){const src=r.hit.cut||(DRESS._u&&DRESS._uk===r.key?DRESS._u:(DRESS._u&&URL.revokeObjectURL(DRESS._u),DRESS._uk=r.key,DRESS._u=URL.createObjectURL(r.hit.blob)));show(src,r.hit.cut?'':'blend');
-   ui.innerHTML=`<span class="stage-badge ai">${ic('spark',14)} AI try-on</span>${extraHTML}`;return}
+   ui.innerHTML=`<span class="stage-badge ai">${ic('spark',14)} AI try-on · preview</span>${extraHTML}<button class="btn ghost sm stage-cta flatbtn" id="showFlat">Flat-lay view</button>`;DRESS.bindUI();return}
   const busy=r.state==='queued'||r.state==='running';
   if(busy){const L=TRY.Q.live;let t='Waiting for the AI…';if(L&&r.job&&L.job===r.job.id)t=L.phase==='queue'?`In the AI queue (#${L.pos})…`:L.phase==='waking'?'Waking the AI up (~30 s)…':`Dressing you: ${esc(L.name)} (${L.step}/${L.of})…`;
    show(r.partial?(r.partial.cut||URL.createObjectURL(r.partial.blob)):base,'dressing');const el=r.job&&r.job.started?Math.round((Date.now()-r.job.started)/1000):0;const pct=Math.min(95,Math.round(el/(30*r.steps.length)*100));
@@ -190,7 +198,7 @@ const DRESS={
   if(r.state==='new'&&TRY.aiAllowed()&&localStorage.getItem('auto_try')==='1'&&TRY.left()>0){clearTimeout(DRESS._q);DRESS._q=setTimeout(()=>TRY.enqueue(DRESS.items()),1100);show(base,'dressing');ui.innerHTML=`<span class="stage-badge">Getting the AI ready…</span>${extraHTML}`;return}
   const msg=r.state==='failed'||r.state==='partial'?(r.job.err||'The AI try-on didn\'t work.'):TRY.left()<=0&&TRY.aiAllowed()?'Free AI try-ons used up for today. Saved looks still show instantly.':null;
   show('','board-mode');ui.innerHTML=DRESS.board(its,msg);DRESS.bindUI()},
- bindUI(){const b=$('#tapTry');if(b)b.onclick=()=>DRESS.tryNow()},
+ bindUI(){const b=$('#tapTry');if(b)b.onclick=()=>DRESS.tryNow();const sa=$('#showAI');if(sa)sa.onclick=()=>{DRESS.flatView=false;DRESS.fill()};const sf=$('#showFlat');if(sf)sf.onclick=()=>{DRESS.flatView=true;DRESS.fill()};DRESS.mountFlat()},
  tilt(st){const tl=st.querySelector('.tilt');if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   const set=(x,y)=>{tl.style.setProperty('--ry',(x*9).toFixed(2)+'deg');tl.style.setProperty('--rx',(-y*5).toFixed(2)+'deg');tl.style.setProperty('--sx',(-x*10).toFixed(1)+'px')};
   st.onpointermove=e=>{const r=st.getBoundingClientRect();set((e.clientX-r.left)/r.width*2-1,(e.clientY-r.top)/r.height*2-1)};st.onpointerleave=()=>set(0,0);
@@ -208,7 +216,7 @@ function rDress(a){const tops=byCat('top'),bots=byCat('bottom');const p=S.pick;T
  <div class="stage" id="stage"><div class="studio"></div><div class="tilt"><div class="floor"></div><img class="person" id="person" alt="Me wearing the outfit" style="display:none"></div><div class="stage-ui" id="stageUI"></div></div>
  <div><div class="rail-h">Bottoms</div><div class="rail">${bots.map(i=>tile(i,p.bottom===i.id?'sel':'',`data-c="bottom"`)).join('')||addT}</div></div></div>
  ${sec(2,'Shoes, jackets, hats &amp; bags')}<div class="shoerow">${byCat('shoes').concat(byCat('outer'),byCat('hat'),byCat('acc')).map(i=>tile(i,p[i.cat]===i.id?'sel':'',`data-c="${i.cat}"`)).join('')||addT}</div>
- <p class="muted" style="text-align:center">${S.me.base?(TRY.aiAllowed()&&localStorage.getItem('auto_try')==='1'?`AI dresses you as you pick · <button class="link" id="autoOff">turn off</button>`:'The AI shows the clothes on you'):'<b>Make your mini-me in Me</b> to see clothes on you'} · <span class="badge">AI = lilac</span></p>
+ <p class="muted" style="text-align:center">${S.me.base?(TRY.aiAllowed()&&localStorage.getItem('auto_try')==='1'?`AI dresses you as you pick · <button class="link" id="autoOff">turn off</button>`:'The AI shows the clothes on you'):'<b>Make your mini-me in Me</b> to see clothes on you'} · <span class="badge">Flat view</span> · <span class="badge">AI = oxblood</span></p>
  <p class="consent">${ic('eye',16)} Try it on sends your cut-out avatar photo to an online AI to make the picture.</p>
  <button class="btn lav full" id="tryO" style="margin-bottom:10px">${ic('wand',18)} Try it on (AI preview)</button>
  <div class="row"><button class="btn" id="saveO">${ic('heart',18)} Save outfit</button><button class="btn ton" id="shuf">${ic('shuffle',18)} Shuffle</button></div><div id="inbox">${DRESS.inbox()}</div>`;
