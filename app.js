@@ -114,7 +114,7 @@ function addItem(){openSheet(`${head('Add a piece')}<p class="muted">Lay it flat
 
 function itemSheet(it){const copy={...it,occ:[...(it.occ||[])]};openSheet(`${head(esc(it.name))}${itemForm(copy)}
  <p class="muted">Worn ${it.wears||0}× · last worn: ${it.lastWorn||'never'}</p>
- <div class="row"><button class="btn danger" id="del">Delete</button><button class="btn" id="save">Save</button></div>`,root=>{bindForm(root,copy);
+ ${['top','bottom','outer'].includes(it.cat)?'<button class="btn alt full" id="tryI" style="margin-bottom:8px">👗 Try it on (AI preview)</button>':''}<div class="row"><button class="btn danger" id="del">Delete</button><button class="btn" id="save">Save</button></div>`,root=>{bindForm(root,copy);const ti=root.querySelector('#tryI');if(ti)ti.onclick=()=>{closeSheet();setTimeout(()=>TRY.tryOn([it]),150)};
  root.querySelector('#save').onclick=async()=>{copy.name=root.querySelector('#fName').value.trim()||copy.name;Object.assign(it,copy);await DB.put('items',it);closeSheet();render();toast('Saved')};
  root.querySelector('#del').onclick=async()=>{if(!confirm('Delete this item?'))return;await DB.del('items',it.id);S.items=S.items.filter(i=>i!==it);Object.keys(S.pick).forEach(k=>S.pick[k]===it.id&&delete S.pick[k]);closeSheet();render()}})}
 
@@ -127,8 +127,10 @@ function rDress(a){const tops=byCat('top'),bots=byCat('bottom'),shoes=byCat('sho
  <div class="stage"><img class="av" src="${avatarSrc()}" alt="avatar">${order.filter(k=>p[k]&&item(p[k])).map(k=>`<img class="lay l-${k}" src="${item(p[k]).img}" alt="">`).join('')}</div>
  <div><div class="rail-h">👖 Bottoms</div><div class="rail">${bots.map(i=>tile(i,p.bottom===i.id?'sel':'',`data-c="bottom"`)).join('')||'<span class="muted">none</span>'}</div></div></div>
  <div class="shoerow">${shoes.concat(byCat('outer'),byCat('hat'),byCat('acc')).map(i=>tile(i,p[i.cat]===i.id?'sel':'',`data-c="${i.cat}"`)).join('')}</div>
- <p class="muted" style="text-align:center">Shoes, jackets, hats & bags above · ${S.me.avatar?'':'<b>add your photo in Me</b> · '}<span class="badge">realistic AI try-on coming in v1</span></p>
+ <p class="muted" style="text-align:center">Shoes, jackets, hats & bags above · ${S.me.avatar?'':'<b>add your photo in Me</b> · '}<span class="badge">flat view</span></p>
+ <button class="btn full" id="tryO" style="margin-bottom:8px">👗 Try it on (AI preview)</button>
  <div class="row"><button class="btn" id="saveO">♥ Save outfit</button><button class="btn alt" id="shuf">✦ Shuffle</button></div>`;
+ $('#tryO').onclick=()=>TRY.tryOn(Object.values(S.pick).map(item));
  a.querySelectorAll('[data-c]').forEach(t=>t.onclick=()=>{const c=t.dataset.c;S.pick[c]=S.pick[c]===t.dataset.id?undefined:t.dataset.id;render()});
  $('#clr').onclick=()=>{S.pick={};render()};$('#shuf').onclick=()=>{S.pick=shuffle();render()};$('#saveO').onclick=saveOutfit;}
 function shuffle(occ){const r=a=>a[Math.floor(Math.random()*a.length)];const f=c=>byCat(c).filter(i=>!occ||(i.occ||[]).includes(occ));
@@ -171,11 +173,7 @@ function calendar(){const d=new Date(),y=d.getFullYear(),m=d.getMonth(),first=(n
  for(let i=1;i<=n;i++){const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;h+=`<div class="${has.has(ds)?'has':''}" ${has.has(ds)?`data-day="${ds}" role="button"`:''}>${i}</div>`}
  return `<div style="font-weight:700;margin-bottom:6px">${d.toLocaleString('en-ZA',{month:'long',year:'numeric'})}</div><div class="cal">${h}</div>`}
 function rMe(a){const me=S.me;const hist=S.outfits.slice().sort((x,y)=>y.date.localeCompare(x.date));
- a.innerHTML=`<h1>Me 🩷</h1><div class="card" style="text-align:center">
- <div class="avatar-frame ${me.cut?'cut':''}"><img src="${avatarSrc()}" alt="my avatar"></div>
- <p><span class="badge">✨ realistic AI avatar coming in v1</span></p><p class="muted">For now your avatar is your own photo${me.cut?' with the background removed':' in a cut-out frame'}. Stand straight, full body, plain wall behind you.</p>
- <div class="row"><label class="btn" style="margin:0">📷 Selfie / full body<input type="file" accept="image/*" capture="user" id="avCam" hidden></label><label class="btn alt" style="margin:0">🖼️ Gallery<input type="file" accept="image/*" id="avGal" hidden></label></div>
- ${me.avatar?'<div class="row" style="margin-top:8px"><button class="btn alt sm" id="avBg">✂️ Remove background (beta)</button><button class="btn danger sm" id="avDel">Remove photo</button></div>':''}<p class="muted" id="avMsg"></p></div>
+ a.innerHTML=`<h1>Me 🩷</h1>${TRY.meCard()}
  <div class="card"><h2 style="margin-top:0">My details</h2><p class="muted">Used later so the AI avatar gets your proportions right. Stays on this phone.</p>
  <label>Name / nickname</label><input id="mName" value="${esc(me.name||'')}" maxlength="30">
  <label>Height (cm)</label><input id="mH" type="number" inputmode="numeric" min="100" max="220" value="${esc(me.height||'')}">
@@ -184,18 +182,16 @@ function rMe(a){const me=S.me;const hist=S.outfits.slice().sort((x,y)=>y.date.lo
  <button class="btn full" id="mSave" style="margin-top:12px">Save details</button></div>
  <div class="card"><h2 style="margin-top:0">Outfit calendar</h2>${calendar()}<h2>History</h2>${hist.map(o=>`<div class="idea" style="align-items:center"><div style="flex:2;min-width:0;font-size:13px"><b>${esc(o.name)}</b><br>${o.date} · ${o.occ} · ${'💖'.repeat(o.rate||1)}</div>${Object.values(o.items).slice(0,3).map(id=>item(id)?tile(item(id)):'').join('')}<button class="icon-btn" data-wear="${o.id}" aria-label="Wear again" style="width:34px;height:34px">↻</button></div>`).join('')||'<p class="muted">No saved outfits yet. Dress up in Dress Me and tap Save.</p>'}</div>
  <div class="card"><h2 style="margin-top:0">Feedback for Dad 💬</h2><p class="muted">${S.feedback.length} note(s) saved.</p><div class="row"><button class="btn sm" id="fbNew">Write a note</button><button class="btn alt sm" id="fbExp">Share / copy notes</button></div></div>
- <div class="card"><h2 style="margin-top:0">Privacy & data</h2><p class="muted">Everything (photos, clothes, outfits) is stored only on this phone. Nothing is uploaded. No accounts, no ads, nothing public.</p>
+ ${TRY.settingsCard()}<div class="card"><h2 style="margin-top:0">Privacy & data</h2><p class="muted">Everything (photos, clothes, outfits, your avatar and measurements) is stored only on this phone. No accounts, no ads, nothing public.</p><p class="muted"><b>AI try-on:</b> only when you tap <b>Try it on</b>, your avatar photo and the clothing photo are sent to a free Hugging Face Space (an AI server) just to make the picture. The result is saved on this phone. Don't use it if you're not OK with that. <b>Delete my avatar</b> (above) and <b>Delete all my data</b> wipe the avatar, measurements and saved try-ons from this phone.</p>
  <div class="row"><button class="btn alt sm" id="clrDemo">Clear demo items</button><button class="btn alt sm" id="addDemo">Bring demo items back</button></div><div class="row" style="margin-top:8px"><button class="btn danger sm" id="wipe">Delete all my data</button></div></div>`;
- const pick=async f=>{if(!f)return;const img=await fileToImg(f);const c=scaled(img,900);S.me.avatar=c.toDataURL('image/jpeg',.88);S.me.cut=false;await DB.set('me',S.me);render();tryAiCut(true)};
- $('#avCam').onchange=e=>pick(e.target.files[0]);$('#avGal').onchange=e=>pick(e.target.files[0]);
- if($('#avBg'))$('#avBg').onclick=()=>tryAiCut(false);if($('#avDel'))$('#avDel').onclick=async()=>{delete S.me.avatar;S.me.cut=false;await DB.set('me',S.me);render()};
+ TRY.bindMe(a);
  $('#mSave').onclick=async()=>{Object.assign(S.me,{name:$('#mName').value.trim(),height:$('#mH').value,shape:$('#mShape').value,style:$('#mStyle').value});await DB.set('me',S.me);toast('Saved 💖')};
  a.querySelectorAll('[data-wear]').forEach(b=>b.onclick=()=>{const o=S.outfits.find(x=>x.id===b.dataset.wear);S.pick={...o.items};setTab('dress')});
  a.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{const os=S.outfits.filter(o=>o.date===b.dataset.day);openSheet(`${head(b.dataset.day)}${os.map(o=>`<div class="card"><b>${esc(o.name)}</b> · ${o.occ}<div class="idea">${Object.values(o.items).map(id=>item(id)?tile(item(id)):'').join('')}</div></div>`).join('')}`)});
  $('#fbNew').onclick=feedbackSheet;$('#fbExp').onclick=exportFeedback;
  $('#clrDemo').onclick=async()=>{for(const i of S.items.filter(i=>i.demo))await DB.del('items',i.id);S.items=S.items.filter(i=>!i.demo);S.pick={};toast('Demo items cleared');render()};
  $('#addDemo').onclick=async()=>{await seedDemo();await load();toast('Demo items are back');render()};
- $('#wipe').onclick=async()=>{if(!confirm('Delete ALL photos, clothes, outfits and notes from this phone? This cannot be undone.'))return;for(const s of ['items','outfits','feedback','kv'])await DB.clear(s);localStorage.clear();location.reload()};}
+ $('#wipe').onclick=async()=>{if(!confirm('Delete ALL photos, clothes, outfits and notes from this phone? This cannot be undone.'))return;for(const s of ['items','outfits','feedback','kv'])await DB.clear(s);await TRY.cClear();localStorage.clear();location.reload()};}
 // Optional in-browser person cut-out (open-source model, runs on the phone; the model files download once, the photo never leaves the phone).
 async function tryAiCut(auto){const msg=$('#avMsg');if(msg)msg.textContent='✂️ Removing background on your phone… (first time can take a minute)';
  try{const mod=await Promise.race([import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm'),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),20000))]);
@@ -220,7 +216,7 @@ $('#fb').onclick=feedbackSheet;
 /* ---------- onboarding ---------- */
 function onboarding(){const a=$('#app');$('#nav').classList.add('hidden');$('#fb').classList.add('hidden');
  a.innerHTML=`<div class="hero"><div class="big">👗✨</div><h1>My Closet</h1><p class="muted">Snap your clothes, dress your mini-me, save outfits, get ideas.</p>
- <div class="card" style="text-align:left"><h2 style="margin-top:0">🔒 Your privacy</h2><div class="pill">📱 Everything stays on <b>this phone</b>. Nothing is uploaded, no account, no one else can see it.</div><div class="pill">🗑️ You can delete everything any time in <b>Me → Privacy</b>.</div><div class="pill">👨‍👧 This is a test version made by your dad. Under 18? A parent says OK first (that's the law, POPIA).</div></div>
+ <div class="card" style="text-align:left"><h2 style="margin-top:0">🔒 Your privacy</h2><div class="pill">📱 Everything stays on <b>this phone</b>, no account, no one else can see it. Only if you tap <b>Try it on</b> is your avatar sent to Hugging Face to make the AI picture.</div><div class="pill">🗑️ You can delete everything any time in <b>Me → Privacy</b>.</div><div class="pill">👨‍👧 This is a test version made by your dad. Under 18? A parent says OK first (that's the law, POPIA).</div></div>
  <label style="display:flex;gap:10px;align-items:center;text-align:left"><input type="checkbox" id="ok" style="width:22px;height:22px;flex:none"> I've read this and a parent said it's OK</label>
  <button class="btn full" id="go" style="margin-top:12px">Let's go 💖</button></div>`;
  $('#go').onclick=async()=>{if(!$('#ok').checked)return toast('Tick the box first 🙂');await DB.set('onboarded',today());start()}}
