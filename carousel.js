@@ -14,7 +14,7 @@ function ring(el,items,onPick){
  B.forEach(b=>b.onclick=e=>{if(root._moved)return e.preventDefault();onPick(b.dataset.id)});
  if(!can3d()){root.classList.add('flat');return}
  const n=B.length,step=360/n,rad=Math.round(Math.min(250,(el.clientWidth||340)*.62));
- let a=0,v=0,drag=null,last=performance.now(),idle=0,slow=0,frames=0;
+ R.style.transform=`translateZ(${-rad}px)`;let a=0,v=0,drag=null,last=performance.now(),idle=0,slow=0,frames=0;
  const draw=()=>{B.forEach((b,i)=>{const ang=((i*step+a)%360+540)%360-180,cos=Math.cos(ang*Math.PI/180);b.style.transform=`rotateY(${ang}deg) translateZ(${rad}px)`;b.style.opacity=(.35+.65*Math.max(0,cos)).toFixed(2);b.style.zIndex=Math.round(cos*10)+10;b.tabIndex=cos>.7?0:-1})};
  root.addEventListener('pointerdown',e=>{drag={x:e.clientX,a};root._moved=false;v=0});
  root.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x;if(Math.abs(dx)>6)root._moved=true;const na=drag.a+dx*.35;v=(na-a)*60;a=na;idle=performance.now();draw()});
