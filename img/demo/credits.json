@@ -1,0 +1,132 @@
+[
+ {
+  "file": "img/demo/knit.webp",
+  "item": "Sage knit (demo_0)",
+  "source": "Wikimedia Commons",
+  "title": "File:Jersei-coll-alt.jpg",
+  "url": "https://commons.wikimedia.org/wiki/File:Jersei-coll-alt.jpg",
+  "author": "Joan Rocaguinard",
+  "licence": "CC BY-SA 3.0",
+  "note": "Attribution + share-alike: the cut-out is a derivative, so it stays CC BY-SA 3.0."
+ },
+ {
+  "file": "img/demo/tee.webp",
+  "item": "White tee (demo_1)",
+  "source": "rawpixel (via Openverse)",
+  "title": "rawpixel 5943912",
+  "url": "https://www.rawpixel.com/image/5943912/free-public-domain-cc0-photo",
+  "author": "not listed (rawpixel)",
+  "licence": "CC0 1.0",
+  "note": "Worn on a person: I masked out skin and jeans to make a ghost-mannequin look."
+ },
+ {
+  "file": "img/demo/tank.webp",
+  "item": "Olive tank (demo_2)",
+  "source": "Flickr (via Openverse)",
+  "title": "HATOPANTS Women's Cotton Racerback Basic Crop Tank Tops",
+  "url": "https://www.flickr.com/photos/185514373@N06/49060686992",
+  "author": "shop8447",
+  "licence": "CC0 1.0",
+  "note": "Ghost mannequin. I removed the small neck label (brand tag)."
+ },
+ {
+  "file": "img/demo/jeans.webp",
+  "item": "Dark jeans (demo_3)",
+  "source": "Unsplash",
+  "title": "photo-1624378439575-d8705ad7ae80",
+  "url": "https://unsplash.com/photos/blue-denim-jeans-on-white-textile-YeGao3uk8kI",
+  "author": "listed as Acne Studios, March 2017",
+  "licence": "Unsplash License",
+  "note": "Already in v2/v3. No logo visible after the cut-out."
+ },
+ {
+  "file": "img/demo/skirt.webp",
+  "item": "Pleated skirt (demo_4)",
+  "source": "rawpixel (via Openverse)",
+  "title": "rawpixel 7450276",
+  "url": "https://www.rawpixel.com/image/7450276/image-black-public-domain-clothing",
+  "author": "not listed (rawpixel)",
+  "licence": "CC0 1.0",
+  "note": ""
+ },
+ {
+  "file": "img/demo/shorts.webp",
+  "item": "Aqua shorts (demo_5)",
+  "source": "rawpixel (via Openverse)",
+  "title": "rawpixel 11515784",
+  "url": "https://www.rawpixel.com/image/11515784/teal-mens-swim-shorts-pink-background",
+  "author": "not listed (rawpixel)",
+  "licence": "CC0 1.0",
+  "note": "Men's swim shorts; pink background keyed out."
+ },
+ {
+  "file": "img/demo/jacket.webp",
+  "item": "Belted jacket (demo_6)",
+  "source": "rawpixel / The Met (via Openverse)",
+  "title": "rawpixel 8080136",
+  "url": "https://www.rawpixel.com/image/8080136/jacket",
+  "author": "The Metropolitan Museum of Art (Open Access)",
+  "licence": "CC0 1.0",
+  "note": "Museum piece, vintage cut, not a denim jacket."
+ },
+ {
+  "file": "img/demo/sneakers.webp",
+  "item": "White sneakers (demo_7), replaces the Puma photo",
+  "source": "rawpixel (via Openverse)",
+  "title": "rawpixel 5926397",
+  "url": "https://www.rawpixel.com/image/5926397/photo-image-public-domain-fashion-free",
+  "author": "not listed (rawpixel)",
+  "licence": "CC0 1.0",
+  "note": "No brand mark visible."
+ },
+ {
+  "file": "img/demo/plimsolls.webp",
+  "item": "Canvas plimsolls (demo_8), replaces the Nike photo",
+  "source": "Wikimedia Commons",
+  "title": "File:La \"Bensimon\".jpg",
+  "url": "https://commons.wikimedia.org/wiki/File:La_%22Bensimon%22.jpg",
+  "author": "MarnieP 29",
+  "licence": "CC BY-SA 4.0",
+  "note": "The brand name is in the file title. No logo is visible in the cut-out at this angle."
+ },
+ {
+  "file": "img/demo/brogues.webp",
+  "item": "Lace-ups (demo_9), replaces flats SVG",
+  "source": "Wikimedia Commons",
+  "title": "File:Collins Street Slip.JPG",
+  "url": "https://commons.wikimedia.org/wiki/File:Collins_Street_Slip.JPG",
+  "author": "HeavyTaste Australia",
+  "licence": "CC BY-SA 3.0",
+  "note": "A men's shoe. A girls' flat would be a better fit; I found none with a free licence."
+ },
+ {
+  "file": "img/demo/cap.webp",
+  "item": "Sailor cap (demo_10)",
+  "source": "Wikimedia Commons",
+  "title": "File:Casquette marine.jpg",
+  "url": "https://commons.wikimedia.org/wiki/File:Casquette_marine.jpg",
+  "author": "Édouard Hue (User:EdouardHue)",
+  "licence": "CC BY-SA 3.0",
+  "note": "A mariner cap, not a baseball cap. The only free baseball cap (5tashabbus kepka) had a printed logo and looked rendered."
+ },
+ {
+  "file": "img/demo/bag.webp",
+  "item": "Top-handle bag (demo_11)",
+  "source": "rawpixel (via Openverse)",
+  "title": "rawpixel 5921479",
+  "url": "https://www.rawpixel.com/image/5921479/photo-image-public-domain-shadow-black",
+  "author": "not listed (rawpixel)",
+  "licence": "CC0 1.0",
+  "note": ""
+ },
+ {
+  "file": "img/demo/stock-flatlay.jpg",
+  "item": "Ideas: catalogue / editorial flat-lay",
+  "source": "Wikimedia Commons (from Unsplash)",
+  "title": "File:Outfit (Unsplash).jpg",
+  "url": "https://commons.wikimedia.org/wiki/File:Outfit_(Unsplash).jpg",
+  "author": "Toa Heftiba",
+  "licence": "CC0",
+  "note": "Used uncut as a stock mood image."
+ }
+]
