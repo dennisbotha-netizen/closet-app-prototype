@@ -103,7 +103,7 @@ T.avatarSheet=()=>{if(!T.aiAllowed()&&!localStorage.getItem('pin'))return PIN.se
  if(!PIN.unlocked())return PIN.ask('A parent needs to OK making an avatar',()=>T.avatarSheet());
  const me=S.me;
  openSheet(`${head('Make my avatar ✨')}
- <div class="howto"><svg viewBox="0 0 200 420" fill="none" stroke="#6a4cc0" stroke-width="5" stroke-dasharray="10 8"><circle cx="100" cy="45" r="28"/><path d="M62 92q38-20 76 0l14 96-14 4-8-58-4 100 10 172h-26l-10-140-10 140H64l10-172-4-100-8 58-14-4z"/></svg><div><b>How to stand</b><ul><li>Head to shoes in the photo</li><li>Face the camera, arms a little out</li><li>Plain wall, good light, fitted clothes</li><li>Prop the phone at waist height and use the timer</li></ul></div></div>
+ <div class="howto"><svg viewBox="0 0 200 420" fill="none" stroke="#a8875a" stroke-width="3" stroke-dasharray="10 8"><circle cx="100" cy="45" r="28"/><path d="M62 92q38-20 76 0l14 96-14 4-8-58-4 100 10 172h-26l-10-140-10 140H64l10-172-4-100-8 58-14-4z"/></svg><div><b>How to stand</b><ul><li>Head to shoes in the photo</li><li>Face the camera, arms a little out</li><li>Plain wall, good light, fitted clothes</li><li>Prop the phone at waist height and use the timer</li></ul></div></div>
  <div class="pill">${ic('phone')}<span> Pose check and cut-out happen <b>on this phone</b>. Only the cut-out avatar (never the original photo) is sent to Hugging Face, and only for AI try-on.</span></div>
  <label>My height (cm)</label><input id="avH" type="number" inputmode="numeric" min="100" max="220" value="${esc(me.height||'')}" placeholder="e.g. 158">
  <button class="btn full" id="avLive" style="margin-top:10px">${ic('camera')} Live camera with pose guide + timer</button>
