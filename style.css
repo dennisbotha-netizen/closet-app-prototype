@@ -235,3 +235,13 @@ label.chk input{accent-color:var(--ink)}
 .tipframe svg{width:100%;height:100%;fill:none;stroke:var(--ink);stroke-width:1.2;stroke-dasharray:4 3}
 .credit{font-size:11.5px;color:var(--ink2);margin-top:22px;line-height:1.45}
 .credits .cr{font-size:12.5px;margin:6px 0}.credits a{color:var(--ink);min-height:0}
+/* v3b slice 6: photo tilt (photo3d.js) */
+.p3d{position:absolute;inset:0;perspective:1100px;overflow:hidden;touch-action:pan-y;cursor:grab}
+.p3d-board{position:absolute;inset:0;transform-style:preserve-3d;will-change:transform}
+.p3d-l{position:absolute;transform-style:preserve-3d}
+.p3d-sh{position:absolute;inset:0;width:100%;filter:brightness(0) blur(7px);opacity:.22;pointer-events:none}
+.p3d-im{position:relative;display:block;width:100%;-webkit-user-select:none;user-select:none}
+.p3d-sn{position:absolute;inset:0;mix-blend-mode:soft-light;pointer-events:none}
+.preview.tilt3d{position:relative;height:300px;background:radial-gradient(80% 60% at 50% 38%,#fbfaf7 0,#ece7df 70%,#e2dcd2 100%)!important}
+.preview.tilt3d>#pv{display:none}
+.tcap{position:absolute;left:12px;bottom:10px;font:500 11px Geist;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);pointer-events:none}
