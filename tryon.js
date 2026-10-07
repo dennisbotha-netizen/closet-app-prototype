@@ -110,7 +110,7 @@ T.alive=async id=>{try{const r=await fetch('https://huggingface.co/api/spaces/'+
 T.call=async(p,person,garm,it,kind,onStatus,signal)=>{T.patchFetch();T.gradio=T.gradio||await import(GRADIO);const {Client,handle_file}=T.gradio;const {token}=T.cfg();
  const opts={events:['data','status']};if(token){opts.token=token;opts.hf_token=token}const client=await Client.connect(p.id,opts);let job;
  if(p.type==='idm')job=client.submit('/tryon',[{background:handle_file(person),layers:[],composite:null},handle_file(garm),T.desc(it),true,true,30,42]);
- else if(p.type==='leffa')job=client.submit('/leffa_predict_vt',[handle_file(person),handle_file(garm),false,30,2.5,42,'viton_hd',kind,false]);
+ else if(p.type==='leffa')job=client.submit('/leffa_predict_vt',[handle_file(person),handle_file(garm),false,30,2.5,42,kind==='lower_body'?'dress_code':'viton_hd',kind,false]);
  else job=client.submit('/submit_function',[{background:handle_file(person),layers:[],composite:null},handle_file(garm),kind==='lower_body'?'lower':'upper',50,2.5,42,'result only']);
  signal.onabort=()=>{try{job.cancel()}catch(e){}};
  for await(const m of job){if(signal.aborted)break;if(m.type==='status'){if(m.stage==='error')throw new Error(m.message||'Space error');onStatus(m)}
