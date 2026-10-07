@@ -231,7 +231,7 @@ async function saveOutfit(){const p=Object.fromEntries(Object.entries(S.pick).fi
   await DB.put('outfits',o);S.outfits.push(o);if(date===today())for(const id of Object.values(p)){const it=item(id);it.wears=(it.wears||0)+1;it.lastWorn=date;await DB.put('items',it)}
   if(rate>=3){S.prefs.like=[...(S.prefs.like||[]),(p.top||'')+'>'+(p.bottom||'')].slice(-40);DB.set('prefs',S.prefs)}
   closeSheet();vib([10,40,10]);toast(date>today()?'Planned 📅':'Outfit saved 💖');if(S.outfits.length===1)confetti()}})}
-function confetti(){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;const d=document.createElement('div');d.className='confetti';d.innerHTML=Array.from({length:24},(_,i)=>`<i style="left:${Math.random()*100}%;background:${['#c42a6c','#6a4cc0','#f4d35e','#7fb88a'][i%4]};animation-delay:${Math.random()*.3}s"></i>`).join('');document.body.appendChild(d);setTimeout(()=>d.remove(),1800)}
+function confetti(){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;const d=document.createElement('div');d.className='confetti';d.innerHTML=Array.from({length:24},(_,i)=>`<i style="left:${Math.random()*100}%;background:${['#0f0e0d','#5a1a1f','#a8875a','#d9d2c8'][i%4]};animation-delay:${Math.random()*.3}s"></i>`).join('');document.body.appendChild(d);setTimeout(()=>d.remove(),1800)}
 
 /* ---------- Ideas: simple local rules + weather ---------- */
 function ideas(){const out=[];const wk=S.weather||'warm';const W={warm:{},cool:{want:'outer'},rainy:{want:'outer'}}[wk];
