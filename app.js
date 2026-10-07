@@ -123,9 +123,11 @@ function bindForm(root,it){const sug=()=>{const n=root.querySelector('#fName');i
 const readForm=(root,it)=>{it.name=root.querySelector('#fName').value.trim()||it.suggest||`${it.colour} ${catName(it.cat)}`;const p=root.querySelector('#fPrice').value;it.price=p?+p:undefined};
 
 // one photo -> draft item (cut-out + auto-tags), all on the phone
-async function prepPhoto(f){const img=await fileToImg(f);let c=scaled(img);const orig=c.toDataURL('image/jpeg',.85);const ok=removeBg(c);if(ok)c=trim(c);const col=dominant(c);
+async function prepPhoto(f){const L=await GAR.load(f);let c=scaled(L.src);const orig=c.toDataURL('image/jpeg',.85);const ok=removeBg(c);if(ok)c=trim(c);const col=dominant(c);
  let g=TAG.guess(c);if(TAG.enabled()){try{g=await TAG.clip(c)}catch(e){console.warn('smart tag unavailable',e&&e.message)}}
- const it={id:uid(),name:'',cat:g.cat,tagWhy:g.why,pattern:g.pattern,colour:col,autoColour:col,occ:['casual'],img:ok?c.toDataURL('image/png'):orig,orig,cut:ok,photo:!ok,added:Date.now(),lastWorn:null,wears:0};
+ // v3c: straighten upright + auto-crop + key points (cut-outs only; full photos just get the EXIF fix)
+ let raw=null,kp=null,up={exif:L.exif};if(ok){raw=c.toDataURL('image/png');try{const r=await GAR.prep(c,g.cat);c=r.canvas;kp=r.kp;up={...up,...r.info}}catch(e){console.warn('upright',e&&e.message)}}
+ const it={id:uid(),name:'',cat:g.cat,tagWhy:g.why,pattern:g.pattern,colour:col,autoColour:col,occ:['casual'],img:ok?c.toDataURL('image/png'):orig,orig,raw,kp,upright:up,cut:ok,photo:!ok,added:Date.now(),lastWorn:null,wears:0};
  it.suggest=`${col} ${g.kind||catName(it.cat)}`;return it}
 function addItem(){openSheet(`${head('Add pieces')}<div class="phototip" role="note"><div class="tipframe" aria-hidden="true"><svg viewBox="0 0 60 80"><path d="M14 8h10q6 6 12 0h10l12 10-7 9-5-4v49H14V23l-5 4-7-9z"/></svg></div><div><p class="eyebrow" style="margin:0 0 4px">Photo tip · 10 seconds a piece</p><p class="pq" style="margin:0;font-size:18px">Lay it flat on a bed or floor, plain sheet, daylight, phone straight above, whole piece in frame.</p></div></div>
  <div class="pill">${ic('image')}<span>No faces needed. Photos stay on this phone, the cut-out and tags are done here too.</span></div>
@@ -139,21 +141,21 @@ function addItem(){openSheet(`${head('Add pieces')}<div class="phototip" role="n
  root.querySelector('#cam').onchange=e=>go(e.target.files);root.querySelector('#gal').onchange=e=>go(e.target.files);})}
 // swipe-through "check & fix" cards
 function review(root,q,i,saved){const after=root.querySelector('#after');if(i>=q.length){closeSheet();S.filter='all';render();if(saved){toast(`Added ${saved} piece${saved>1?'s':''} to your closet 💖`);vib(15)}return}
- const it=q[i];after.innerHTML=`<h2>Check & fix ${q.length>1?`<span class="badge">${i+1} of ${q.length}</span>`:''}</h2>${itemForm(it)}<p class="muted">${it.cut?'Background removed ✨':'Couldn\'t find a plain background, kept the full photo.'}</p>
+ const it=q[i];after.innerHTML=`<h2>Check & fix ${q.length>1?`<span class="badge">${i+1} of ${q.length}</span>`:''}</h2>${it.cut?GAR.fixUI(it):''}<div class="${it.cut?'nopv':''}">${itemForm(it)}</div><p class="muted">${it.cut?'Background removed ✨':'Couldn\'t find a plain background, kept the full photo.'}</p>
  <div class="row">${it.cut?'<button class="btn ghost sm" id="useOrig">Use original photo</button>':''}<button class="btn ghost sm" id="better">${ic('wand',18)} Better cut-out</button></div>
  <div class="row" style="margin-top:10px">${q.length>1?'<button class="btn ghost" id="skip">Skip</button>':''}<button class="btn" id="save">${q.length>1&&i<q.length-1?'Save & next':'Save to closet'}</button></div>`;
- bindForm(after,it);const uo=after.querySelector('#useOrig');if(uo)uo.onclick=()=>{it.img=it.orig;it.cut=false;it.photo=true;after.querySelector('#pv').src=it.orig;uo.remove()};
- after.querySelector('#better').onclick=async e=>{const b=e.currentTarget;b.disabled=true;b.textContent='Working on this phone…';try{const img=await TRY.loadImg(it.orig);const c=await aiCut(scaled(img));it.img=c.toDataURL('image/png');it.cut=true;it.photo=false;after.querySelector('#pv').src=it.img;b.textContent='Better cut-out ✓'}catch(err){console.warn('ai cut',err&&err.message);b.textContent='Not available right now'}};
+ bindForm(after,it);if(it.cut){GAR.bindFix(after,it,src=>{const pv=after.querySelector('#pv');if(pv)pv.src=src});after.querySelectorAll('[data-cat]').forEach(b=>b.addEventListener('click',()=>after.querySelector('[data-fx=auto]').click()))}const uo=after.querySelector('#useOrig');if(uo)uo.onclick=()=>{it.img=it.orig;it.cut=false;it.photo=true;it.kp=null;after.querySelector('#pv').src=it.orig;const fb=after.querySelector('.fixbox');if(fb)fb.remove();after.querySelector('.nopv')&&after.querySelector('.nopv').classList.remove('nopv');uo.remove()};
+ after.querySelector('#better').onclick=async e=>{const b=e.currentTarget;b.disabled=true;b.textContent='Working on this phone…';try{const img=await TRY.loadImg(it.orig);let c=await aiCut(scaled(img));it.raw=c.toDataURL('image/png');try{const r=await GAR.prep(c,it.cat);c=r.canvas;it.kp=r.kp;it.upright={...(it.upright||{}),...r.info}}catch(e){}it.img=c.toDataURL('image/png');it.cut=true;it.photo=false;after.querySelector('#pv').src=it.img;b.textContent='Better cut-out ✓'}catch(err){console.warn('ai cut',err&&err.message);b.textContent='Not available right now'}};
  const sk=after.querySelector('#skip');if(sk)sk.onclick=()=>review(root,q,i+1,saved);
- after.querySelector('#save').onclick=async()=>{readForm(after,it);['orig','suggest','tagWhy'].forEach(k=>delete it[k]);await DB.put('items',it);S.items.unshift(it);review(root,q,i+1,saved+1)};root.scrollTop=0}
+ after.querySelector('#save').onclick=async()=>{readForm(after,it);['orig','raw','suggest','tagWhy'].forEach(k=>delete it[k]);await DB.put('items',it);S.items.unshift(it);review(root,q,i+1,saved+1)};root.scrollTop=0}
 
 function itemSheet(it){const copy={...it,occ:[...(it.occ||[])]};openSheet(`${head(esc(it.name))}${itemForm(copy)}
  <p class="muted">Worn ${it.wears||0}× · last worn: ${fmtDs(it.lastWorn)}${it.price&&it.wears?` · R${(it.price/it.wears).toFixed(0)} per wear`:''}</p>
- <label class="btn ghost full" style="margin-bottom:8px"><input type="file" accept="image/*" id="rePh" hidden>${ic('camera',18)} Retake photo</label>
+ ${it.cut&&!it.photo?`<details class="fixd"><summary>Fix rotation / key points</summary>${GAR.fixUI(copy)}</details>`:''}<label class="btn ghost full" style="margin-bottom:8px"><input type="file" accept="image/*" id="rePh" hidden>${ic('camera',18)} Retake photo</label>
  ${['top','bottom','outer'].includes(it.cat)?`<button class="btn lav full" id="tryI" style="margin-bottom:8px">${ic('wand',18)} Try it on (AI preview)</button>`:''}<div class="row"><button class="btn danger" id="del">${ic('trash',18)} Delete</button><button class="btn" id="save">Save</button></div>`,root=>{bindForm(root,copy);
  const pvw=root.querySelector('.preview');let p3=null;if(it.img&&!it.photo&&window.P3D){pvw.classList.add('tilt3d');p3=P3D.mount(pvw,{items:[{src:it.img,alt:it.name,x:50,y:50,w:it.cat==='shoes'||it.cat==='hat'||it.cat==='acc'?56:50,z:40,r:0}]});if(p3)pvw.insertAdjacentHTML('beforeend','<span class="tcap">Drag to tilt</span>');else pvw.classList.remove('tilt3d')}
- const ti=root.querySelector('#tryI');if(ti)ti.onclick=()=>{closeSheet();S.pick={[it.cat]:it.id};setTimeout(()=>{setTab('dress');DRESS.tryNow()},150)};
- root.querySelector('#rePh').onchange=async e=>{const f=e.target.files[0];if(!f)return;const n=await prepPhoto(f);copy.img=n.img;copy.cut=n.cut;copy.photo=n.photo;copy.edited=Date.now();root.querySelector('#pv').src=n.img;if(p3)p3.swap(0,n.img);toast('New photo ready, tap Save')};
+ if(root.querySelector('.fixbox'))GAR.bindFix(root,copy,src=>{root.querySelector('#pv').src=src;if(p3)p3.swap(0,src)});const ti=root.querySelector('#tryI');if(ti)ti.onclick=()=>{closeSheet();S.pick={[it.cat]:it.id};setTimeout(()=>{setTab('dress');DRESS.tryNow()},150)};
+ root.querySelector('#rePh').onchange=async e=>{const f=e.target.files[0];if(!f)return;const n=await prepPhoto(f);copy.img=n.img;copy.cut=n.cut;copy.photo=n.photo;copy.kp=n.kp;copy.upright=n.upright;copy.edited=Date.now();root.querySelector('#pv').src=n.img;if(p3)p3.swap(0,n.img);toast('New photo ready, tap Save')};
  root.querySelector('#save').onclick=async()=>{readForm(root,copy);Object.assign(it,copy);delete it.suggest;await DB.put('items',it);closeSheet();render();toast('Saved')};
  root.querySelector('#del').onclick=async()=>{await DB.del('items',it.id);S.items=S.items.filter(i=>i!==it);const was={...S.pick};Object.keys(S.pick).forEach(k=>S.pick[k]===it.id&&delete S.pick[k]);closeSheet();render();
   toast(`Deleted ${it.name}`,{label:'Undo',fn:async()=>{await DB.put('items',it);S.items.push(it);S.items.sort((a,b)=>b.added-a.added);S.pick=was;render()}})}})}
@@ -187,19 +189,23 @@ const DRESS={
   const extraHTML=extras.length?`<div class="also">${extras.map(i=>`<div class="t-${tint(i)}" title="${esc(i.name)}"><img src="${i.img}" alt="${esc(i.name)}"></div>`).join('')}</div>`:'';
   if(!me.base){show('','board-mode');ui.innerHTML=DRESS.board(its,its.length?'':null);DRESS.bindUI();return}
   const r=await TRY.lookup(its);if(seq!==DRESS._seq)return;const base=me.cutout||me.avatar;
-  if(r.state==='none'){show(base);ui.innerHTML=`<span class="stage-badge">${its.length?'Pick a top or bottom for AI':'Your mini-me'}</span>${extraHTML}`;return}
+  // v3c: instant fitting preview (garment key points mapped to her pose, on the phone, not AI)
+  const pSrc=r.partial?(r.partial.cut||DRESS.burl(r.partial)):null;const fit=r.state==='done'?null:await (pSrc?GAR.compose(its.filter(i=>!r.steps.slice(0,1).includes(i)),pSrc,r.partial.id):GAR.compose(its)).catch(()=>null);if(seq!==DRESS._seq)return;const pvB=pSrc&&fit?`<span class="stage-badge ai">${ic('spark',14)} AI top + quick-fit bottom</span>`:`<span class="stage-badge pv">Quick fit preview · not AI</span>`;
+  if(r.state==='none'){show(fit||base);ui.innerHTML=`<span class="stage-badge">${its.length?'Pick a top or bottom for AI':'Your mini-me'}</span>`;return}
   DRESS._ai=r.state==='done';if(r.state==='done'&&DRESS.flatView){show('','board-mode');ui.innerHTML=DRESS.board(its,null);DRESS.bindUI();return}
-  if(r.state==='done'){const src=r.hit.cut||(DRESS._u&&DRESS._uk===r.key?DRESS._u:(DRESS._u&&URL.revokeObjectURL(DRESS._u),DRESS._uk=r.key,DRESS._u=URL.createObjectURL(r.hit.blob)));show(src,r.hit.cut?'':'blend');
+  if(r.state==='done'){const src=r.hit.cut||DRESS.burl(r.hit);show(src,r.hit.cut?'':'blend');
    ui.innerHTML=`<span class="stage-badge ai">${ic('spark',14)} AI try-on · preview</span>${extraHTML}<button class="btn ghost sm stage-cta flatbtn" id="showFlat">Flat-lay view</button>`;DRESS.bindUI();return}
   const busy=r.state==='queued'||r.state==='running';
   if(busy){const L=TRY.Q.live;let t='Waiting for the AI…';if(L&&r.job&&L.job===r.job.id)t=L.phase==='queue'?`In the AI queue (#${L.pos})…`:L.phase==='waking'?'Waking the AI up (~30 s)…':`Dressing you: ${esc(L.name)} (${L.step}/${L.of})…`;
-   show(r.partial?(r.partial.cut||URL.createObjectURL(r.partial.blob)):base,'dressing');const el=r.job&&r.job.started?Math.round((Date.now()-r.job.started)/1000):0;const pct=Math.min(95,Math.round(el/(30*r.steps.length)*100));
+   show(fit||pSrc||base,'dressing');const el=r.job&&r.job.started?Math.round((Date.now()-r.job.started)/1000):0;const pct=Math.min(95,Math.round(el/(30*r.steps.length)*100));
    ui.innerHTML=`<span class="stage-badge">${t}</span><div class="prog"><i style="width:${pct}%"></i></div><p class="stage-msg">Usually ~30 s per piece. Keep dressing, I'll ping you.</p>${extraHTML}`;clearTimeout(DRESS._tk);DRESS._tk=setTimeout(()=>DRESS.fill(),2000);return}
   // not tried yet / failed: never paste garments on her body, show an outfit board instead
-  if(r.state==='new'&&TRY.aiAllowed()&&localStorage.getItem('auto_try')==='1'&&TRY.left()>0){clearTimeout(DRESS._q);DRESS._q=setTimeout(()=>TRY.enqueue(DRESS.items()),1100);show(base,'dressing');ui.innerHTML=`<span class="stage-badge">Getting the AI ready…</span>${extraHTML}`;return}
+  if(r.state==='new'&&TRY.aiAllowed()&&localStorage.getItem('auto_try')==='1'&&TRY.left()>0){clearTimeout(DRESS._q);DRESS._q=setTimeout(()=>TRY.enqueue(DRESS.items()),1100);show(fit||base,'dressing');ui.innerHTML=`<span class="stage-badge">Getting the AI ready…</span>${fit?'':extraHTML}`;return}
   const msg=r.state==='failed'||r.state==='partial'?(r.job.err||'The AI try-on didn\'t work.'):TRY.left()<=0&&TRY.aiAllowed()?'Free AI try-ons used up for today. Saved looks still show instantly.':null;
-  show('','board-mode');ui.innerHTML=DRESS.board(its,msg);DRESS.bindUI()},
- bindUI(){const b=$('#tapTry');if(b)b.onclick=()=>DRESS.tryNow();const sa=$('#showAI');if(sa)sa.onclick=()=>{DRESS.flatView=false;DRESS.fill()};const sf=$('#showFlat');if(sf)sf.onclick=()=>{DRESS.flatView=true;DRESS.fill()};DRESS.mountFlat()},
+  if(fit&&!DRESS.flatView){show(fit);ui.innerHTML=`${pvB}${msg?`<p class="stage-msg">${esc(msg)}</p>`:''}<button class="btn ghost sm flatbtn fl-top" id="showFlat">Flat-lay</button><button class="btn lav sm stage-cta" id="tapTry">${ic('wand',18)} ${r.state==='failed'||r.state==='partial'?'Try again with AI':'Tap to try on with AI'}</button>`;DRESS.bindUI();return}
+  show('','board-mode');ui.innerHTML=DRESS.board(its,msg)+(fit?'<button class="btn ghost sm flatbtn fl-top" id="showFit">Fit preview</button>':'');DRESS.bindUI()},
+ burl(h){if(!DRESS._bu||DRESS._bu.h!==h.id){DRESS._bu&&URL.revokeObjectURL(DRESS._bu.u);DRESS._bu={h:h.id,u:URL.createObjectURL(h.blob)}}return DRESS._bu.u},
+ bindUI(){const b=$('#tapTry');if(b)b.onclick=()=>DRESS.tryNow();const sa=$('#showAI');if(sa)sa.onclick=()=>{DRESS.flatView=false;DRESS.fill()};const sF=$('#showFit');if(sF)sF.onclick=()=>{DRESS.flatView=false;DRESS.fill()};const sf=$('#showFlat');if(sf)sf.onclick=()=>{DRESS.flatView=true;DRESS.fill()};DRESS.mountFlat()},
  tilt(st){const tl=st.querySelector('.tilt');if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   const set=(x,y)=>{tl.style.setProperty('--ry',(x*9).toFixed(2)+'deg');tl.style.setProperty('--rx',(-y*5).toFixed(2)+'deg');tl.style.setProperty('--sx',(-x*10).toFixed(1)+'px')};
   st.onpointermove=e=>{const r=st.getBoundingClientRect();set((e.clientX-r.left)/r.width*2-1,(e.clientY-r.top)/r.height*2-1)};st.onpointerleave=()=>set(0,0);

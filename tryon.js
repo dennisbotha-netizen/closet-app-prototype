@@ -16,9 +16,9 @@ T.canvas=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;r
 T.CAP=40;T.MAXAGE=30*864e5;T.cdb=null;
 T.cOpen=()=>T.cdb?Promise.resolve(T.cdb):new Promise((res,rej)=>{const r=indexedDB.open('closet-tryon',2);r.onupgradeneeded=()=>{const d=r.result;if(d.objectStoreNames.contains('c'))d.deleteObjectStore('c');d.createObjectStore('c',{keyPath:'id'})};r.onsuccess=()=>{T.cdb=r.result;res(T.cdb)};r.onerror=()=>rej(r.error)});
 T.cReq=async(mode,fn)=>{const d=await T.cOpen();return new Promise(r=>{const q=fn(d.transaction('c',mode).objectStore('c'));q.onsuccess=()=>r(q.result);q.onerror=()=>r()})};
-T.cGet=async id=>{const v=await T.cReq('readonly',s=>s.get(id));if(v){if(Date.now()-v.t>T.MAXAGE){T.cReq('readwrite',s=>s.delete(id));return}v.used=Date.now();T.cReq('readwrite',s=>s.put(v))}return v};
-T.cPut=async v=>{v.used=Date.now();await T.cReq('readwrite',s=>s.put(v));const all=await T.cReq('readonly',s=>s.getAll())||[];if(all.length>T.CAP){all.sort((a,b)=>a.used-b.used);for(const x of all.slice(0,all.length-T.CAP))await T.cReq('readwrite',s=>s.delete(x.id))}};
-T.cClear=()=>T.cReq('readwrite',s=>s.clear());
+T.cGet=async id=>{if(T._mem.has(id))return T._mem.get(id);const v=await T.cReq('readonly',s=>s.get(id));if(v&&!v.blob&&v.buf)v.blob=new Blob([v.buf],{type:v.type||'image/jpeg'});if(v&&!v.blob)return;if(v){if(Date.now()-v.t>T.MAXAGE){T.cReq('readwrite',s=>s.delete(id));return}v.used=Date.now();const {blob,...rest}=v;T.cReq('readwrite',s=>s.put(rest))}return v};
+T.cPut=async v=>{v.used=Date.now();const {blob,...rest}=v;rest.buf=await blob.arrayBuffer();rest.type=blob.type;const ok=await T.cReq('readwrite',s=>s.put(rest));if(ok===undefined)T._mem.set(v.id,v);const all=await T.cReq('readonly',s=>s.getAll())||[];if(all.length>T.CAP){all.sort((a,b)=>a.used-b.used);for(const x of all.slice(0,all.length-T.CAP))await T.cReq('readwrite',s=>s.delete(x.id))}};
+T._mem=new Map();T.cClear=()=>{T._mem.clear();return T.cReq('readwrite',s=>s.clear())};
 T.cCount=async()=>(await T.cReq('readonly',s=>s.count()))||0;
 
 /* ---- settings + daily counter (local SA date) ---- */
@@ -96,7 +96,10 @@ T.analyse=async(img,heightCm)=>{const {pose,seg,multi}=await T.loadMP();const c=
 // cut the person out of an AI result so it sits on the studio stage like the base avatar
 T.cutResult=async blob=>{const url=URL.createObjectURL(blob);try{const img=await T.loadImg(url);const {seg,multi}=await T.loadMP();const c=scaled(img,1024);const W=c.width,H=c.height;
  const {mask,mw,mh}=T.personConf(seg,multi,c);const A=T.refine(mask,mw,mh,W,H);const box=T.bbox(A,W,H);if(box.h<H*.4)throw new Error('mask too small');return T.cutPNG(c,A,box)}
- catch(e){console.warn('result cut-out skipped',e&&e.message);return null}finally{URL.revokeObjectURL(url)}};
+ catch(e){console.warn('result cut-out skipped',e&&e.message);try{return await T.cropWhite(url)}catch(e2){return null}}finally{URL.revokeObjectURL(url)}};
+// fallback: crop an AI result (person on white) to the person so it fills the stage head-to-feet
+T.cropWhite=async url=>{const img=await T.loadImg(url);const c=scaled(img,1024),W=c.width,H=c.height,d=c.getContext('2d').getImageData(0,0,W,H).data;const A=new Float32Array(W*H);for(let i=0;i<W*H;i++){const m=Math.min(d[i*4],d[i*4+1],d[i*4+2]);A[i]=m<235?1:0}
+ const b=T.bbox(A,W,H);if(b.h<H*.3)return null;const pad=Math.round(b.h*.015),x=Math.max(0,b.x-pad),y=Math.max(0,b.y-pad),w=Math.min(W-x,b.w+2*pad),h=Math.min(H-y,b.h+2*pad);const o=T.canvas(w,h);o.getContext('2d').drawImage(c,x,y,w,h,0,0,w,h);return o.toDataURL('image/jpeg',.9)};
 
 /* ================= AVATAR SHEET ================= */
 T.avatarSheet=()=>{if(!T.aiAllowed()&&!localStorage.getItem('pin'))return PIN.setup(()=>T.avatarSheet());
@@ -139,7 +142,7 @@ T.providers=kind=>{const {space}=T.cfg();const L=[];const up=kind!=='lower_body'
  return L.filter(p=>up||p.type!=='idm')};
 T.gradio=null;
 T.patchFetch=()=>{if(T._pf)return;T._pf=1;const f0=window.fetch.bind(window);window.fetch=(u,o)=>{try{const url=typeof u==='string'?u:u.url;if(/\.hf\.space\//.test(url))o={...(o||{}),credentials:'omit'}}catch(e){}return f0(u,o)}};
-T.stage=async id=>{try{const r=await fetch('https://huggingface.co/api/spaces/'+id+'/runtime',{credentials:'omit'});if(!r.ok)return 'RUNNING';const j=await r.json();return j.stage||'RUNNING'}catch(e){return 'RUNNING'}};
+T.stage=async id=>{try{const r=await fetch('https://huggingface.co/api/spaces/'+id+'/runtime',{credentials:'omit',signal:AbortSignal.timeout?AbortSignal.timeout(8000):undefined});if(!r.ok)return 'RUNNING';const j=await r.json();return j.stage||'RUNNING'}catch(e){return 'RUNNING'}};
 T.alive=async id=>/RUNNING|SLEEPING|APP_STARTING|BUILDING/.test(await T.stage(id));
 T.prewarm=()=>{if(T._warm||!T.aiAllowed())return;T._warm=1;T.stage('yisol/IDM-VTON');T.stage('franciszzj/Leffa');import(GRADIO).then(m=>T.gradio=T.gradio||m).catch(()=>{})};
 T.call=async(p,person,garm,it,kind,onStatus,signal)=>{T.patchFetch();T.gradio=T.gradio||await import(GRADIO);const {Client,handle_file}=T.gradio;const {token}=T.cfg();
@@ -149,7 +152,7 @@ T.call=async(p,person,garm,it,kind,onStatus,signal)=>{T.patchFetch();T.gradio=T.
  else job=client.submit('/submit_function',[{background:handle_file(person),layers:[],composite:null},handle_file(garm),kind==='lower_body'?'lower':'upper',50,2.5,42,'result only']);
  signal.onabort=()=>{try{job.cancel()}catch(e){}};
  for await(const m of job){if(signal.aborted)break;if(m.type==='status'){if(m.stage==='error')throw new Error(m.message||'Space error');onStatus(m)}
-  if(m.type==='data'){const f=m.data[0];const url=f&&(f.url||f.path);if(!url)throw new Error('no image returned');return T.urlToBlob(url)}}
+  if(m.type==='data'){const f=m.data[0];const url=f&&(f.url||f.path);if(!url)throw new Error('no image returned');const out=await T.urlToBlob(url);try{job.cancel&&job.cancel()}catch(e){}return out}}
  throw new Error('cancelled')};
 T.kindOf=it=>it.cat==='bottom'?'lower_body':'upper_body';
 T.isQuota=e=>/quota|ZeroGPU|exceeded|limit/i.test(String(e&&e.message||e));
@@ -162,13 +165,13 @@ T.run=async(steps,status)=>{const t0=performance.now();let person=null,used=[],r
  for(let i=0;i<steps.length;i++){const it=steps[i];const key=await T.keyFor(steps.slice(0,i+1));
   const hit=await T.cGet(key);if(hit){res=hit;person=hit.blob;used.push(hit.via+' (saved)');continue}
   if(T.left()<=0)throw Object.assign(new Error('quota (local daily cap)'),{quota:1});
-  person=person||await T.personBlob();const kind=T.kindOf(it),garm=await T.garmentBlob(it);let ok=false,lastErr;
+  const st0=performance.now();person=person||await T.personBlob();const kind=T.kindOf(it),garm=await T.garmentBlob(it);let ok=false,lastErr;
   for(const p of T.providers(kind)){const st=await T.stage(p.id);if(!/RUNNING|SLEEPING|APP_STARTING|BUILDING/.test(st)){lastErr=lastErr||new Error('Space down');console.warn('try-on',p.id,st,'skipped');continue}
    status({step:i+1,of:steps.length,name:it.name,via:p.id.split('/')[1],phase:st==='SLEEPING'?'waking':'dressing',t0:performance.now()});
    const ac=new AbortController();const s0=performance.now();
-   try{const remaining=TO_MS-(performance.now()-t0);if(remaining<5000)throw new Error('timeout');
+   try{const remaining=TO_MS-(performance.now()-st0);if(remaining<5000)throw new Error('timeout');
     const blob=await Promise.race([T.call(p,person,garm,it,kind,m=>{if(m.position!=null)status({step:i+1,of:steps.length,name:it.name,via:p.id.split('/')[1],phase:'queue',pos:m.position+1})},ac.signal),new Promise((_,r)=>setTimeout(()=>{ac.abort();r(new Error('timeout'))},remaining))]);
-    T.bump();const cut=await T.cutResult(blob);res={id:key,blob,cut,via:p.id,t:Date.now(),secs:+((performance.now()-s0)/1000).toFixed(1)};await T.cPut(res);person=blob;used.push(`${p.id} ${res.secs} s`);ok=true;break}
+    T.bump();const cut=await Promise.race([T.cutResult(blob),new Promise(r=>setTimeout(()=>r(null),20000))]);res={id:key,blob,cut,via:p.id,t:Date.now(),secs:+((performance.now()-s0)/1000).toFixed(1)};await T.cPut(res);person=blob;used.push(`${p.id} ${res.secs} s`);ok=true;break}
    catch(e){if(!(lastErr&&T.isQuota(lastErr)))lastErr=e;console.warn('try-on',p.id,e&&e.message);if(/timeout/.test(e&&e.message))break}}
   if(!ok){const e=lastErr||new Error('failed');if(res)return {res,used,secs:((performance.now()-t0)/1000).toFixed(1),partial:{done:steps.slice(0,i),failed:steps.slice(i),err:e}};throw e}}
  return {res,used,secs:((performance.now()-t0)/1000).toFixed(1)}};
@@ -181,15 +184,15 @@ T.emit=()=>{T.save();document.dispatchEvent(new CustomEvent('tryon'))};
 T.jobFor=key=>T.Q.jobs.find(j=>j.key===key);
 T.enqueue=async(items,opt={})=>{const steps=T.steps(items);if(!steps.length||!S.me.base)return null;const key=await T.keyFor(steps);
  if(await T.cGet(key))return null;let j=T.jobFor(key);
- if(j){if(j.state==='failed'||j.state==='partial'){j.state='queued';j.tries=0;j.err=null}}
+ if(j){if(j.state==='failed'||j.state==='partial'||j.state==='done'){j.state='queued';j.tries=0;j.err=null}}
  else{j={id:uid(),key,ids:steps.map(s=>s.id),label:steps.map(s=>s.name).join(' + '),state:'queued',tries:0,bg:!!opt.bg,at:Date.now()};T.Q.jobs.push(j)}
  if(!opt.bg){T.Q.jobs=T.Q.jobs.filter(x=>x===j||x.state!=='queued'||x.bg);}// newer pick replaces an older un-started pick
  T.emit();T.pump();return j};
-T.pump=async()=>{if(T.Q.busy)return;const j=T.Q.jobs.find(x=>x.state==='queued'&&(!x.wait||x.wait<Date.now()))||null;
+T.pump=async()=>{if(T.Q.busy)return;const rdy=x=>x.state==='queued'&&(!x.wait||x.wait<Date.now());const j=T.Q.jobs.find(x=>rdy(x)&&!x.bg)||T.Q.jobs.find(rdy)||null;
  if(!j){const w=T.Q.jobs.find(x=>x.state==='queued'&&x.wait);if(w)setTimeout(T.pump,Math.max(500,w.wait-Date.now()));return}
  const steps=j.ids.map(item).filter(Boolean);if(steps.length!==j.ids.length){j.state='failed';j.err='A piece was deleted';T.emit();return T.pump()}
  T.Q.busy=true;j.state='running';j.started=Date.now();T.emit();
- try{const r=await T.run(steps,s=>{T.Q.live={job:j.id,...s};document.dispatchEvent(new CustomEvent('tryon-status'))});
+ try{const r=await Promise.race([new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout (job watchdog)')),steps.length*TO_MS+60000)),T.run(steps,s=>{T.Q.live={job:j.id,...s};document.dispatchEvent(new CustomEvent('tryon-status'))})]);
   j.state=r.partial?'partial':'done';j.secs=r.secs;j.used=r.used;if(r.partial)j.err=T.friendly(r.partial.err);
   if(!j.bg||S.tab!=='dress')toast(r.partial?'Part of your outfit is ready ✨':'Your AI try-on is ready ✨');vib(15)}
  catch(e){const retry=!T.isQuota(e)&&!e.quota&&j.tries<1&&/sleep|queue|timeout|503|down|fetch|error/i.test(String(e.message));
@@ -202,12 +205,12 @@ T.lookup=async items=>{const steps=T.steps(items);if(!steps.length||!S.me.base)r
  const hit=await T.cGet(key);if(hit)return {state:'done',hit,steps,key};
  // best partial (e.g. top done, bottom pending)
  let partial=null;if(steps.length>1){partial=await T.cGet(await T.keyFor(steps.slice(0,1)))}
- const j=T.jobFor(key);return {state:j?j.state:'new',job:j,partial,steps,key}};
-T.offerPrecompute=()=>{if(!T.aiAllowed()||!S.me.base)return;let favs=T.favourites(),b0=T.left();favs=favs.filter(f=>(b0-=f.length)>=0);const n=favs.length;if(!n)return;
+ const j=T.jobFor(key);return {state:j&&j.state!=='done'?j.state:'new',job:j,partial,steps,key}};
+T.offerPrecompute=()=>{if(!T.aiAllowed()||!S.me.base)return;let favs=T.favourites(),b0=T.left()-4;favs=favs.filter(f=>(b0-=f.length)>=0);const n=favs.length;if(!n)return;
  openSheet(`${head('Get your favourites ready? ✨')}<p>I can dress your avatar in your favourite outfits in the background, so Dress Me shows them instantly.</p>
  ${favs.slice(0,n).map(f=>`<div class="idea">${f.map(i=>tile(i)).join('')}</div>`).join('')}
  <p class="muted">Uses about ${favs.slice(0,n).reduce((s,f)=>s+f.length,0)} of today's ~${T.left()} free AI try-ons. Your cut-out avatar is sent to Hugging Face to make the pictures. Saved on this phone.</p>
- <div class="row"><button class="btn ghost" data-close>Not now</button><button class="btn" id="preGo">Yes, prepare them</button></div>`,r=>r.querySelector('#preGo').onclick=async()=>{closeSheet();let budget=T.left();for(const f of favs.slice(0,n)){if(budget<=0)break;budget-=f.length;await T.enqueue(f,{bg:true})}toast('Preparing in the background, keep using the app 💖')})};
+ <div class="row"><button class="btn ghost" data-close>Not now</button><button class="btn" id="preGo">Yes, prepare them</button></div>`,r=>r.querySelector('#preGo').onclick=async()=>{closeSheet();let budget=T.left()-4;for(const f of favs.slice(0,n)){if(budget<=0)break;budget-=f.length;await T.enqueue(f,{bg:true})}toast('Preparing in the background, keep using the app 💖')})};
 // favourite combos: loved saved outfits first, then top ideas
 T.favourites=()=>{const seen=new Set(),out=[];const add=o=>{const its=[o.top,o.bottom].map(item).filter(Boolean);if(!its.length)return;const k=its.map(i=>i.id).join();if(seen.has(k))return;seen.add(k);out.push(its)};
  S.outfits.slice().sort((a,b)=>(b.rate||0)-(a.rate||0)).forEach(o=>add(o.items));ideas().forEach(x=>add(x.o));return out.slice(0,4)};
